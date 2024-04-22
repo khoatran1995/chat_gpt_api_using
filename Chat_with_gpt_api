@@ -1,0 +1,106 @@
+# Import the os package
+import os
+import pandas as pd
+
+# Import the openai package
+import openai
+
+# change "apikey" to your key
+openai.api_key = "apikey"  
+
+# Set up the log file
+file_name = 'chat_GPT_log.xlsx'
+if os.path.exists(file_name):
+    # Load existing Excel file into a DataFrame
+    log = pd.read_excel(file_name)
+else:
+    # Create an empty DataFrame with columns
+    columns = ("Model","Prompt Tokens", "Completion Tokens", "Money Spent","ChatGPT Role", "Question","Answer")
+    log = pd.DataFrame(columns = columns)
+
+# Set the model of chatGPT : 
+#  MODEL                           Input               Output                      tokens support
+# "gpt-3.5-turbo-0125"        : $0.0005/1K tokens	$0.0015 / 1K tokens                 16K    
+# "gpt-3.5-turbo-instruct"    : $0.0015/1K tokens	$0.0020 / 1K tokens                  4K
+# "gpt-4-turbo-2024-04-09"    : $0.01 / 1K tokens	$0.03 / 1K tokens                  128K
+# "gpt-4"                     : $0.03 / 1K tokens	$0.06 / 1K tokens                    ?
+# "gpt-4-32k"                 : $0.06 / 1K tokens	$0.12 / 1K tokens                   32K
+# Other models : https://platform.openai.com/docs/deprecations/
+
+model_4_turbo = ("gpt-4-turbo-2024-04-09",0.01/1000,0.03/1000)
+model_4 = ("gpt-4-turbo-2024-04-09",0.03/1000,0.06/1000)
+model_4_32 = ("gpt-4-32k",0.06/1000,0.12/1000)
+model_3_5_turbo = ("gpt-3.5-turbo-0125",0.0005/1000,0.0015/1000)
+model_3_5_instruct = ("gpt-3.5-turbo-instruct",0.0015/1000,0.0020/1000)
+
+#CHOOSE IT
+chatgpt_model = model_4_turbo
+print("Chosen model:",chatgpt_model)
+
+# Define the role of the ChatGPT
+# ROLE:
+#     Grammar assistant:
+#     Storyteller:
+#     A poet:
+#     A coder:
+#     A biomatician:
+
+assistant = 'You are an assistant'
+grammar_professor = 'You are an good proofreader. You check and correct the grammar and give suggestion to improve for each lines.'
+#CHOOSE IT
+system_msg = assistant
+print("Chosen ChatGPT role:", grammar_professor)
+
+
+# Ask the ChatGPT
+previous_summary = ""
+question = "Help me proofread this: From July 2022 to March 2023, FIT implemented 135 community mCXR screening events in HCM and HN. At these, participants at high risk for TB were screened using both TB screening forms and chest X-rays. We used ACIS, a mobile health (mHealth) system, to verbally screen individuals at the events and to store information regarding their TB status. For on-site chest X-ray screenings, we utilized a mobile CXR truck and/or the Xair machine, a portable CXR device. Digital CXR files (DICOMs) were exported and stored securely. At many events, CXRs were further analyzed using CAD software (qXR). We leveraged the scores from this CAD software to identify individuals who required Xpert tests, thereby enhancing TB detection capabilities. A CXR DICOM library from these mCXR events was developed to assess the performance of CAD software.  The criteria for choosing the participants of this library were recorded.  Based on the data on the ACIS system and CAD software, we chose the CXRs that could give us an objective assessment. The library includes CXR DICOM files and participant's screening and Xpert assay data. The dataset included gender, age, health insurance, TB symptoms, contacts, TB history, diabetes, HIV, and radiography system information for each CXR.  The radiography system is different between the events that used CXR truck (DRTECH) and the events that used the Xair machine (Fujifilm Xair)."
+if previous_summary == "":
+    user_msg = question
+else:
+    user_msg = "This is your previours answer summary: " + '"'+ previous_summary + '"'+ "   Based on that, proceed with this follow up request:" + '"'+question+'"'
+print(user_msg)
+
+
+# Retrieve the answer
+chat_completion = openai.chat.completions.create(
+    messages=[{
+            "role": "system",
+            "content": system_msg,
+        },
+        {
+            "role": "user",
+            "content": user_msg,
+        }
+    ],
+    model=chatgpt_model[0]
+)
+
+# Break the output into variables
+ouput_message = chat_completion.choices[0].message.content
+tokens_spent = chat_completion.usage
+model = chat_completion.model
+role = chat_completion.choices[0].message.role
+money_spent = chat_completion.usage.prompt_tokens * chatgpt_model[1] + chat_completion.usage.completion_tokens * chatgpt_model[2]
+print(chat_completion)
+
+# Save to log a file (excel file)
+current_run = [chatgpt_model[0],chat_completion.usage.prompt_tokens,chat_completion.usage.completion_tokens,money_spent,role,question,ouput_message]
+log.loc[len(log)] = current_run
+log.to_excel('chat_GPT_log.xlsx', index=False)
+
+
+print ("")
+print ("Prompt tokens: ", chat_completion.usage.prompt_tokens)
+print ("Completion tokens:", chat_completion.usage.completion_tokens)
+print ("Money spent: ", money_spent,"$")
+print ("")
+print ("**********")
+print ("")
+print("Question: ", question)
+print ("")
+print ("**********")
+print ("")
+print ("Answer: ", ouput_message)
+
+
